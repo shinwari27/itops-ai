@@ -4,7 +4,7 @@
 - **Project:** itops-ai
 - **Purpose:** Classify one IT support ticket into category, priority, team and an approved automation scenario.
 - **Output:** One JSON object only.
-- **Version:** 1.2 (October 2026)
+- **Version:** 1.3 (October 2026)
 
 ## Change log
 
@@ -13,6 +13,7 @@
 | 1.0 | First prompt. Missed `low-disk` on slow laptops and wrongly picked `account-lockout` for phishing. |
 | 1.1 | Added explicit automation mappings, safety rules for security tickets, team rule for software, and two examples. All 5 test tickets correct. |
 | 1.2 | Added `troubleshooting` field: 3 numbered first steps for the technician. Saved to the SharePoint column AI Troubleshooting. |
+| 1.3 | Added KNOWLEDGE BASE rule (RAG). The flow searches Azure AI Search (top 2 articles) and sends them with the ticket; the AI cites the KB ID, e.g. "See KB0011." |
 
 ## System prompt (paste into Foundry "Instructions")
 
@@ -54,6 +55,9 @@ SAFETY RULES
 OUTPUT FORMAT
 {"category":"","subcategory":"","priority":"","assignedTeam":"","automationCandidate":false,"automationScenario":null,"confidence":0.0,"summary":"","troubleshooting":""}
 troubleshooting: ALWAYS include 3 short numbered steps a technician should try first, in one line, like "1. ... 2. ... 3. ...". Never include passwords or destructive commands.
+
+KNOWLEDGE BASE
+The ticket may include "Company KB articles". If one matches the problem, base the troubleshooting steps on it and start troubleshooting with its ID, like "See KB0011. 1. ... 2. ... 3. ...". If none match, give general steps.
 
 EXAMPLES
 Ticket: "My laptop is very slow and apps take minutes to open."
