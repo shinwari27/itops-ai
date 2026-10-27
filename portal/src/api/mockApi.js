@@ -258,6 +258,28 @@ export const mockApi = {
     if (!title?.trim() || !description?.trim()) throw new ApiError('validation', 'Add a title and a description.');
     const t = baseTicket({ title: title.trim().slice(0, 120), description: description.trim(), urgency, deviceName, attachments, requestType, requestDetails });
     if (category) t.category = category;
+    // Live mode: also create the real ticket in SharePoint via the "ITOps - Portal Submit" flow.
+    // The flow URL never reaches the browser: Vite's dev server proxies /live/submit to it.
+    if (import.meta.env.VITE_LIVE_SUBMIT === '1') {
+      let data = null;
+      try {
+        const res = await fetch('/live/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: t.title,
+            description: t.description,
+            requesterEmail: import.meta.env.VITE_LIVE_REQUESTER || 'ali@shinwari260.onmicrosoft.com',
+          }),
+        });
+        data = await res.json().catch(() => null);
+        if (!res.ok) throw new ApiError('live_submit', data?.error?.message || `Live submit failed (${res.status})`);
+      } catch (err) {
+        if (err instanceof ApiError) throw err;
+        throw new ApiError('live_submit', 'Could not reach the ITOps AI backend. Check the flow URL in .env.local.');
+      }
+      if (data?.ticketId) t.ticketId = data.ticketId;
+    }
     db.tickets.unshift(t);
     addUpdate(t.ticketId, 'User', me().displayName, 'StatusChange', 'Ticket submitted.');
     emit();
