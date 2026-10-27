@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
   };
   route('/live/submit', env.PORTAL_SUBMIT_URL); // "ITOps - Portal Submit" flow
   route('/live/mine', env.PORTAL_MINE_URL);     // "ITOps - Portal My Tickets" flow
+  route('/live/all', env.PORTAL_ALL_URL);       // "ITOps - Portal All Tickets" flow
   return {
     plugins: [react(), ...(process.env.SINGLEFILE ? [viteSingleFile()] : [])],
     server: { port: 5173, proxy },

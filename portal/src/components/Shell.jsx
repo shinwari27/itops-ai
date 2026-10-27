@@ -104,7 +104,10 @@ export default function Shell({ title, children }) {
     const s = isStaff ? await api.getDashboardSummary() : null;
     return {
       mine: mine.filter((t) => !['Resolved', 'Closed'].includes(t.status)).length,
-      open: s?.totals.open,
+      // Live mode: count real open tickets from SharePoint instead of the demo summary.
+      open: isStaff && import.meta.env.VITE_LIVE_SUBMIT === '1'
+        ? (await api.listTickets({ status: 'Open' })).length
+        : s?.totals.open,
       approvals: s?.totals.pendingApproval,
     };
   }, [user.userId]);

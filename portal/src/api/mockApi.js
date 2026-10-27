@@ -276,7 +276,9 @@ function fromLive(r) {
     requestDetails: null, attachments: [],
     resolution: r.resolution || '', resolutionCode: null, slaDueAt: slaDue(priority, createdAt),
     createdAt, updatedAt: r.resolvedAt || createdAt, resolvedAt: r.resolvedAt || null, closedAt: null,
-    requester: { userId: me().userId, displayName: me().displayName, email: LIVE_REQUESTER },
+    requester: r.requesterEmail
+      ? { userId: r.requesterEmail, displayName: r.requesterName || r.requesterEmail, email: r.requesterEmail }
+      : { userId: me().userId, displayName: me().displayName, email: LIVE_REQUESTER },
     live: true,
   };
 }
@@ -289,6 +291,11 @@ function liveUpdates(t) {
   if (t.automationScenario) list.push(u(3, t.createdAt, 'Automation', 'Automation engine', 'Comment', `Approved automation "${t.automationScenario}": ${t.automationStatus}.`));
   if (t.resolution) list.push(u(4, t.resolvedAt || t.updatedAt, 'Automation', 'Automation engine', 'StatusChange', `Resolved. ${t.resolution}`));
   return list;
+}
+
+async function liveAll() {
+  const rows = await livePost('/live/all', {});
+  return (Array.isArray(rows) ? rows : []).map(fromLive);
 }
 
 async function liveMine() {
@@ -333,7 +340,8 @@ export const mockApi = {
   // GET /api/tickets/{id}
   async getTicket(id) {
     if (LIVE) {
-      const t = (await liveMine()).find((x) => x.ticketId === id);
+      let t = (await liveMine()).find((x) => x.ticketId === id);
+      if (!t && isTech()) t = (await liveAll()).find((x) => x.ticketId === id);
       if (!t) throw new ApiError('not_found', `Ticket ${id} is not visible yet. Try again in a few seconds.`);
       return { ticket: t, updates: liveUpdates(t), automationRuns: [] };
     }
@@ -371,8 +379,8 @@ export const mockApi = {
 
   // GET /api/tickets?team=&status=&priority=&assignee=
   async listTickets(filter = {}) {
-    await latency();
-    let list = db.tickets;
+    if (!LIVE) await latency();
+    let list = LIVE ? await liveAll() : db.tickets;
     if (filter.team && filter.team !== 'All') list = list.filter((t) => t.assignedTeam === filter.team);
     if (filter.status && filter.status !== 'All') {
       list = filter.status === 'Open' ? list.filter((t) => !['Resolved', 'Closed'].includes(t.status)) : list.filter((t) => t.status === filter.status);
