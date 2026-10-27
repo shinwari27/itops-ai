@@ -30,7 +30,7 @@ export default function Queue() {
     <>
       <div className="page-head">
         <div>
-          <h1>Ticket queue</h1>
+          <h1>All tickets</h1>
           <p className="lede">Sorted by priority, then by time left on the SLA. Automation handles its own tickets; you'll see them here only if they escalate.</p>
         </div>
       </div>

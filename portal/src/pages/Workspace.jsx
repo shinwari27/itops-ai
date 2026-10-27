@@ -82,7 +82,7 @@ export default function Workspace() {
   return (
     <>
       <div className="stack" style={{ gap: 10 }}>
-        <Link to="/queue" className="row small" style={{ gap: 4, textDecoration: 'none', width: 'fit-content' }}><Icon name="back" style={{ width: 16, height: 16 }} />Ticket queue</Link>
+        <Link to="/queue" className="row small" style={{ gap: 4, textDecoration: 'none', width: 'fit-content' }}><Icon name="back" style={{ width: 16, height: 16 }} />All tickets</Link>
         <div className="page-head">
           <div style={{ minWidth: 0 }}>
             <div className="row" style={{ gap: 10 }}>

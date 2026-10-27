@@ -25,7 +25,7 @@ const ROUTES = [
   { path: '/kb', title: 'Knowledge base', el: <KnowledgeBase /> },
   { path: '/kb/:id', title: 'Knowledge base · Article', el: <Article /> },
   { path: '/software', title: 'Software', el: <Software />, perm: 'catalog' },
-  { path: '/queue', title: 'Service desk · Ticket queue', el: <Queue />, perm: 'queue' },
+  { path: '/queue', title: 'Service desk · All tickets', el: <Queue />, perm: 'queue' },
   { path: '/queue/:id', title: 'Service desk · Ticket workspace', el: <Workspace />, perm: 'queue' },
   { path: '/dashboard', title: 'Service desk · Operations', el: <Dashboard />, perm: 'dashboard' },
   { path: '/approvals', title: 'Management · Approvals', el: <Approvals />, perm: 'approvals' },

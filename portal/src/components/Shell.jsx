@@ -16,7 +16,7 @@ function useNav(role, counts) {
     { to: '/software', icon: 'box', text: 'Software' },
   ] };
   const desk = { label: 'Service desk', items: [
-    { to: '/queue', icon: 'queue', text: 'Ticket queue', count: counts.open },
+    { to: '/queue', icon: 'queue', text: 'All tickets', count: counts.open },
     { to: '/dashboard', icon: 'chart', text: 'Operations' },
   ] };
   const mgr = { label: 'Management', items: [
@@ -33,7 +33,9 @@ function useNav(role, counts) {
   ] };
   const selfService = { label: 'Self-service', items: [
     { to: '/', icon: 'plus', text: 'Submit a request', end: true },
+    { to: '/tickets', icon: 'ticket', text: 'My tickets', count: counts.mine },
     { to: '/kb', icon: 'book', text: 'Knowledge base' },
+    { to: '/software', icon: 'box', text: 'Software' },
   ] };
   switch (role) {
     case 'Employee': return [help];

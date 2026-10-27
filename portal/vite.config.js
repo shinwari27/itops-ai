@@ -8,15 +8,13 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const proxy = {};
-  if (env.PORTAL_SUBMIT_URL) {
-    const u = new URL(env.PORTAL_SUBMIT_URL);
-    proxy['/live/submit'] = {
-      target: u.origin,
-      changeOrigin: true,
-      secure: true,
-      rewrite: () => u.pathname + u.search,
-    };
-  }
+  const route = (path, url) => {
+    if (!url) return;
+    const u = new URL(url);
+    proxy[path] = { target: u.origin, changeOrigin: true, secure: true, rewrite: () => u.pathname + u.search };
+  };
+  route('/live/submit', env.PORTAL_SUBMIT_URL); // "ITOps - Portal Submit" flow
+  route('/live/mine', env.PORTAL_MINE_URL);     // "ITOps - Portal My Tickets" flow
   return {
     plugins: [react(), ...(process.env.SINGLEFILE ? [viteSingleFile()] : [])],
     server: { port: 5173, proxy },

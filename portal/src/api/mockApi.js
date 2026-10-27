@@ -244,6 +244,58 @@ setTimeout(() => {
     .forEach((t) => runAutomation(t.ticketId));
 }, 1500);
 
+// ---------- Live mode (real SharePoint data via Power Automate) ----------
+// /live/submit and /live/mine are proxied by Vite's dev server to the flow URLs in .env.local.
+const LIVE = import.meta.env.VITE_LIVE_SUBMIT === '1';
+const LIVE_REQUESTER = import.meta.env.VITE_LIVE_REQUESTER || 'ali@shinwari260.onmicrosoft.com';
+
+async function livePost(path, body) {
+  let res;
+  try {
+    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiError('live', 'Could not reach the ITOps AI backend. Check the flow URLs in .env.local.');
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError('live', data?.error?.message || `ITOps AI backend error (${res.status})`);
+  return data;
+}
+
+function fromLive(r) {
+  const priority = PRIORITIES[r.priority] ? r.priority : 'P4';
+  const createdAt = r.createdAt || nowIso();
+  const automationStatus = r.automationStatus === 'Pending' ? 'Queued' : (r.automationStatus || 'Not Applicable');
+  return {
+    ticketId: r.ticketId, title: r.title || '', description: r.description || '',
+    requestType: 'Incident', urgency: 'Medium',
+    category: r.category || 'Other', subcategory: r.subcategory || 'General Question',
+    priority, status: r.status || 'New', assignedTeam: r.assignedTeam || 'Help Desk',
+    assignedTechnician: null, deviceName: null,
+    automationCandidate: !!r.automationScenario, automationScenario: r.automationScenario || null, automationStatus,
+    aiConfidence: 0, aiSummary: r.aiSummary || '', aiRecommendation: r.aiTroubleshooting || '',
+    requestDetails: null, attachments: [],
+    resolution: r.resolution || '', resolutionCode: null, slaDueAt: slaDue(priority, createdAt),
+    createdAt, updatedAt: r.resolvedAt || createdAt, resolvedAt: r.resolvedAt || null, closedAt: null,
+    requester: { userId: me().userId, displayName: me().displayName, email: LIVE_REQUESTER },
+    live: true,
+  };
+}
+
+function liveUpdates(t) {
+  const u = (i, timestamp, actorType, actorName, updateType, message) =>
+    ({ updateId: `${t.ticketId}-${i}`, ticketId: t.ticketId, timestamp, actorType, actorName, updateType, visibility: 'Public', message });
+  const list = [u(1, t.createdAt, 'User', me().displayName, 'StatusChange', 'Ticket submitted.')];
+  if (t.aiSummary) list.push(u(2, t.createdAt, 'AI', 'ITOps AI', 'Comment', `Classified as ${t.category} / ${t.subcategory}, ${t.priority}, routed to ${t.assignedTeam}. ${t.aiSummary}`));
+  if (t.automationScenario) list.push(u(3, t.createdAt, 'Automation', 'Automation engine', 'Comment', `Approved automation "${t.automationScenario}": ${t.automationStatus}.`));
+  if (t.resolution) list.push(u(4, t.resolvedAt || t.updatedAt, 'Automation', 'Automation engine', 'StatusChange', `Resolved. ${t.resolution}`));
+  return list;
+}
+
+async function liveMine() {
+  const rows = await livePost('/live/mine', { requesterEmail: LIVE_REQUESTER });
+  return (Array.isArray(rows) ? rows : []).map(fromLive);
+}
+
 // ---------- Public API (mirrors the spec's API contract) ----------
 
 export const mockApi = {
@@ -258,27 +310,11 @@ export const mockApi = {
     if (!title?.trim() || !description?.trim()) throw new ApiError('validation', 'Add a title and a description.');
     const t = baseTicket({ title: title.trim().slice(0, 120), description: description.trim(), urgency, deviceName, attachments, requestType, requestDetails });
     if (category) t.category = category;
-    // Live mode: also create the real ticket in SharePoint via the "ITOps - Portal Submit" flow.
-    // The flow URL never reaches the browser: Vite's dev server proxies /live/submit to it.
-    if (import.meta.env.VITE_LIVE_SUBMIT === '1') {
-      let data = null;
-      try {
-        const res = await fetch('/live/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: t.title,
-            description: t.description,
-            requesterEmail: import.meta.env.VITE_LIVE_REQUESTER || 'ali@shinwari260.onmicrosoft.com',
-          }),
-        });
-        data = await res.json().catch(() => null);
-        if (!res.ok) throw new ApiError('live_submit', data?.error?.message || `Live submit failed (${res.status})`);
-      } catch (err) {
-        if (err instanceof ApiError) throw err;
-        throw new ApiError('live_submit', 'Could not reach the ITOps AI backend. Check the flow URL in .env.local.');
-      }
-      if (data?.ticketId) t.ticketId = data.ticketId;
+    // Live mode: create the real ticket in SharePoint ("ITOps - Portal Submit" flow).
+    // The real AI flow triages it; the demo engine stays out of the way.
+    if (LIVE) {
+      const data = await livePost('/live/submit', { title: t.title, description: t.description, requesterEmail: LIVE_REQUESTER });
+      return { ticketId: data?.ticketId, status: 'New', automationStatus: 'Not Applicable', createdAt: t.createdAt };
     }
     db.tickets.unshift(t);
     addUpdate(t.ticketId, 'User', me().displayName, 'StatusChange', 'Ticket submitted.');
@@ -289,12 +325,18 @@ export const mockApi = {
 
   // GET /api/tickets/mine
   async getMyTickets() {
+    if (LIVE) return liveMine();
     await latency();
     return clone(db.tickets.filter((t) => t.requester.userId === me().userId));
   },
 
   // GET /api/tickets/{id}
   async getTicket(id) {
+    if (LIVE) {
+      const t = (await liveMine()).find((x) => x.ticketId === id);
+      if (!t) throw new ApiError('not_found', `Ticket ${id} is not visible yet. Try again in a few seconds.`);
+      return { ticket: t, updates: liveUpdates(t), automationRuns: [] };
+    }
     await latency();
     const t = findTicket(id);
     if (!isTech() && t.requester.userId !== me().userId) throw new ApiError('forbidden', 'You can only view your own tickets.');
